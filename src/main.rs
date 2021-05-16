@@ -17,27 +17,40 @@ struct Config {
 
 #[derive(Debug, StructOpt)]
 enum Subcommand {
-    /// Register a new username on a Hue bridge
+    /// Register a new username
     Register,
 
+    /// Scan for new lights
     Scan,
 
+    /// List all known lights
     List,
 
+    /// Blink a specific light
     Blink {
+        /// ID of light to blink
         id: String,
     },
 
+    /// Name a specific light
     Name {
+        /// ID of light to name
         id: String,
+        /// New name for light
         name: String,
     },
+
+    /// Turn all lights on
+    AllOn,
+
+    /// Turn all lights off
+    AllOff,
 }
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "hue", about = "Helper for Philips Hue lights")]
 struct Args {
-    #[structopt(subcommand)]
+    #[structopt(subcommand, rename_all = "kebab")]
     subcommand: Subcommand,
 
     /// Optional IP address for a specific bridge. Tool will search the network if no IP is
@@ -118,6 +131,32 @@ fn cmd_name(bridge: Bridge, id: String, name: String) -> Result<()> {
     Ok(())
 }
 
+fn cmd_all_on(bridge: Bridge) -> Result<()> {
+    let modifier = StateModifier::new().with_on(true);
+
+    let mut lights = bridge.get_all_lights()?;
+    lights.sort_by(|a, b| a.id.cmp(&b.id));
+
+    for light in lights {
+        bridge.set_light_state(light.id, &modifier)?;
+    }
+
+    Ok(())
+}
+
+fn cmd_all_off(bridge: Bridge) -> Result<()> {
+    let modifier = StateModifier::new().with_on(false);
+
+    let mut lights = bridge.get_all_lights()?;
+    lights.sort_by(|a, b| a.id.cmp(&b.id));
+
+    for light in lights {
+        bridge.set_light_state(light.id, &modifier)?;
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args = Args::from_args();
 
@@ -160,5 +199,7 @@ fn main() -> Result<()> {
         Subcommand::List => cmd_list(bridge),
         Subcommand::Blink { id } => cmd_blink(bridge, id),
         Subcommand::Name { id, name } => cmd_name(bridge, id, name),
+        Subcommand::AllOn => cmd_all_on(bridge),
+        Subcommand::AllOff => cmd_all_off(bridge),
     }
 }
