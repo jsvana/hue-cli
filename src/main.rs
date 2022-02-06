@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use huelib::resource::light::{AttributeModifier, Scanner, StateModifier};
 use huelib::Bridge;
+use itertools::Itertools;
 use prettytable::{cell, format, row, Table};
 use serde_derive::Deserialize;
 use structopt::StructOpt;
@@ -25,6 +26,9 @@ enum Subcommand {
 
     /// List all known lights
     List,
+
+    /// List all known groups
+    ListGroups,
 
     /// Blink a specific light
     Blink {
@@ -98,6 +102,29 @@ fn cmd_list(bridge: Bridge) -> Result<()> {
                     "no".to_string()
                 })
                 .unwrap_or("-".to_string()),
+        ]);
+    }
+
+    table.printstd();
+
+    Ok(())
+}
+
+fn cmd_list_groups(bridge: Bridge) -> Result<()> {
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+
+    table.set_titles(row!["id", "name", "lights"]);
+
+    let mut groups = bridge.get_all_groups()?;
+
+    groups.sort_by(|a, b| a.id.cmp(&b.id));
+
+    for group in groups {
+        table.add_row(row![
+            group.id.to_string(),
+            group.name,
+            group.lights.into_iter().join(","),
         ]);
     }
 
@@ -197,6 +224,7 @@ fn main() -> Result<()> {
         }
         Subcommand::Scan => cmd_scan(bridge),
         Subcommand::List => cmd_list(bridge),
+        Subcommand::ListGroups => cmd_list_groups(bridge),
         Subcommand::Blink { id } => cmd_blink(bridge, id),
         Subcommand::Name { id, name } => cmd_name(bridge, id, name),
         Subcommand::AllOn => cmd_all_on(bridge),
